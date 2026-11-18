@@ -1,0 +1,54 @@
+{
+  "name": "lumen-browser",
+  "version": "0.1.0",
+  "description": "Lumen - a light, modern browser with built-in ad blocking (Brave/AdGuard-style)",
+  "main": "src/main/main.js",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/start.js",
+    "dist": "electron-builder --win nsis",
+    "pack": "electron-builder --dir"
+  },
+  "dependencies": {
+    "@ghostery/adblocker-electron": "2.20.3"
+  },
+  "devDependencies": {
+    "electron": "45.3.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.lumen.browser",
+    "productName": "Lumen",
+    "copyright": "Lumen",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lumen",
+      "artifactName": "Lumen-Setup-${version}.exe",
+      "uninstallDisplayName": "Lumen"
+    }
+  }
+}

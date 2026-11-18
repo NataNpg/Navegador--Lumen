@@ -1,0 +1,47 @@
+{
+  "run_id": "run-1",
+  "repo": "Navegador--Lumen",
+  "target": "C:\\Users\\djnat\\Projects\\Lumen",
+  "source_ref": "working tree (no VCS: target is not a git repository; no commit available)",
+  "profile": "standard",
+  "scope_paths": [
+    "src/main/main.js",
+    "src/main/preload-shell.js",
+    "src/main/adblock.js",
+    "src/main/store.js",
+    "src/renderer/shell.js",
+    "src/renderer/shell.html",
+    "scripts/fetch-lists.js",
+    "package.json",
+    "assets/filters"
+  ],
+  "budget": null,
+  "execution_policy": "sandboxed-source-and-local-only",
+  "companion_files": [
+    "DESKTOP-MOBILE-AND-LOCAL-IPC.md",
+    "CLIENT-SIDE.md",
+    "SUPPLY-CHAIN-AND-RELEASE.md"
+  ],
+  "previous_runs": [],
+  "owners": {
+    "run-metadata.json": "parent",
+    "architecture.md": "parent",
+    "coverage-ledger.json": "parent",
+    "findings.json": "parent",
+    "REPORT.md": "parent",
+    "FINDINGS-DETAIL.md": "parent",
+    "NEEDS-VALIDATION.md": "parent"
+  },
+  "run_status": "complete",
+  "notes": [
+    "No previous coverage-ledger.json or findings.json existed for this target, so this run starts from zero coverage.",
+    "Target code was read only. No target code was executed during the audit; the only local check executed was a pure Node path-join computation outside the target process.",
+    "Phase 5 independent verification executed by two fresh agents; both confirmed the five confirmed records with no factual errors."
+  ],
+  "completed_at": "2026-11-17T02:10:00Z",
+  "findings_summary": {
+    "confirmed": 5,
+    "needs_validation": 4,
+    "rejected": 2
+  }
+}

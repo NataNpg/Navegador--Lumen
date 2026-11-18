@@ -1,0 +1,469 @@
+[
+  {
+    "coverage_id": "build-and-release::artifact-distribution::electron-builder-and-nsis::supply-chain",
+    "canonical_refs": {
+      "surface": "build-and-release",
+      "boundary": "artifact-distribution",
+      "subsystem": "electron-builder-and-nsis",
+      "attack_class": "supply-chain"
+    },
+    "surface": "build-and-release",
+    "boundary": "artifact-distribution",
+    "subsystem": "electron-builder-and-nsis",
+    "attack_class": "supply-chain",
+    "starting_paths": [
+      "package.json",
+      "scripts/fetch-lists.js"
+    ],
+    "ordinary_attack_class_block": null,
+    "selected_companion_blocks": [],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [],
+    "wave": 1,
+    "status": "out_of_scope",
+    "agent_id": null,
+    "reviewed_paths": [],
+    "local_checks": [],
+    "result_fingerprints": [],
+    "unresolved": [
+      "Assinatura de código, ícone padrão do instalador e procedência do binário electron-builder não foram avaliados.",
+      "Distribuição do instalador (update/serve) não existe no repositório para revisar."
+    ]
+  },
+  {
+    "coverage_id": "desktop-main-process::renderer-to-main::ipc-and-downloads::untrusted-path-write",
+    "canonical_refs": {
+      "surface": "desktop-main-process",
+      "boundary": "renderer-to-main",
+      "subsystem": "ipc-and-downloads",
+      "attack_class": "untrusted-path-write"
+    },
+    "surface": "desktop-main-process",
+    "boundary": "renderer-to-main",
+    "subsystem": "ipc-and-downloads",
+    "attack_class": "untrusted-path-write",
+    "starting_paths": [
+      "src/main/main.js",
+      "src/main/preload-shell.js"
+    ],
+    "ordinary_attack_class_block": null,
+    "selected_companion_blocks": [],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "wave": 1,
+        "status": "candidate",
+        "agent_id": "hunter-main",
+        "reviewed_paths": [
+          "src/main/main.js",
+          "src/main/preload-shell.js"
+        ],
+        "local_checks": [
+          {
+            "agent_id": "hunter-main",
+            "reviewed_paths": [
+              "src/main/main.js",
+              "src/main/preload-shell.js"
+            ],
+            "invariant": "Todo caminho de escrita derivado de entrada do renderer ou de servidor deve permanecer confinado ao diretório de destino declarado.",
+            "method": "source",
+            "result": "will-download monta savePath com path.join(downloads, item.getFilename()) e uniquePath normaliza apenas o rotulo de exibicao com path.basename; path.join colapsa '..', portanto o caminho final escapa de app.getPath('downloads'). Verificado localmente com a mesma funcao: path.join('C:\\\\Users\\\\vitima\\\\Downloads', '..\\\\..\\\\..\\\\evil.bat') produz 'C:\\\\evil.bat'.",
+            "artifact": null
+          },
+          {
+            "agent_id": "hunter-main",
+            "reviewed_paths": [
+              "src/main/preload-shell.js"
+            ],
+            "invariant": "Canais expostos pela allowlist do preload devem ter efeito limitado ao escopo declarado no handler do main.",
+            "method": "source",
+            "result": "downloads:show aceita p.path arbitrario do renderer e chama shell.showItemInFolder apos apenas existsSync; a allowlist de canais (preload-shell.js:5-37) inclui o canal, e nenhum handler restringe o caminho a um item conhecido de data/downloads.json.",
+            "artifact": null
+          }
+        ],
+        "result_fingerprints": [
+          "lumen/main-downloads-filename-path-traversal",
+          "lumen/downloads-show-arbitrary-path"
+        ],
+        "unresolved": [],
+        "reassignment_reason": "Primeira atribuicao; nenhuma reatribuicao."
+      }
+    ],
+    "wave": 2,
+    "status": "candidate",
+    "agent_id": "verifier-1",
+    "reviewed_paths": [
+      "src/main/main.js",
+      "src/main/preload-shell.js"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "verifier-1",
+        "reviewed_paths": [
+          "src/main/main.js",
+          "src/main/preload-shell.js"
+        ],
+        "invariant": "Todo caminho de escrita derivado de entrada do renderer ou de servidor deve permanecer confinado ao diretório de destino declarado.",
+        "method": "source",
+        "result": "uniquePath (main.js:82-91) preserva '..' no candidato gravado; verificacao local com path.join confirma a travessia. downloads:show (main.js:294-297) aceita qualquer caminho existente.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [
+      "lumen/main-downloads-filename-path-traversal",
+      "lumen/downloads-show-arbitrary-path"
+    ],
+    "unresolved": [
+      "downloads-show depende de comprometer o renderer (nenhum XSS estabelecido; CSP script-src 'self')."
+    ]
+  },
+  {
+    "coverage_id": "desktop-main-process::web-content-to-os::navigation-and-permissions::scheme-handling-and-permissions",
+    "canonical_refs": {
+      "surface": "desktop-main-process",
+      "boundary": "web-content-to-os",
+      "subsystem": "navigation-and-permissions",
+      "attack_class": "scheme-handling-and-permissions"
+    },
+    "surface": "desktop-main-process",
+    "boundary": "web-content-to-os",
+    "subsystem": "navigation-and-permissions",
+    "attack_class": "scheme-handling-and-permissions",
+    "starting_paths": [
+      "src/main/main.js"
+    ],
+    "ordinary_attack_class_block": null,
+    "selected_companion_blocks": [],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "wave": 1,
+        "status": "candidate",
+        "agent_id": "hunter-guest",
+        "reviewed_paths": [
+          "src/main/main.js",
+          "src/renderer/shell.js"
+        ],
+        "local_checks": [
+          {
+            "agent_id": "hunter-guest",
+            "reviewed_paths": [
+              "src/main/main.js"
+            ],
+            "invariant": "Navegação de conteúdo web só pode resultar em destinos web; abertura no sistema operacional exige allowlist e confirmação.",
+            "method": "source",
+            "result": "will-navigate (main.js:185-197) usa denylist: qualquer protocolo fora de {http, https, mailto, about, devtools} cai em shell.openExternal(url) na linha 194.",
+            "artifact": null
+          },
+          {
+            "agent_id": "hunter-guest",
+            "reviewed_paths": [
+              "src/main/main.js",
+              "src/renderer/shell.js"
+            ],
+            "invariant": "Permissões que exigem consentimento do usuário não podem ser concedidas automaticamente por esquema.",
+            "method": "source",
+            "result": "setPermissionRequestHandler (main.js:553-567) mantem media, clipboard-read, window-management e unknown na allowlist e só exige https://; setPermissionCheckHandler (main.js:568-571) devolve true para notifications em qualquer origem.",
+            "artifact": null
+          }
+        ],
+        "result_fingerprints": [
+          "lumen/guest-will-navigate-external-open-denylist",
+          "lumen/permission-media-auto-granted-https",
+          "lumen/notifications-permitted-on-insecure-origins",
+          "lumen/private-session-no-permission-policy"
+        ],
+        "unresolved": [
+          "Politica padrao do Electron para sessao sem handlers (lumen-private) nao determinavel pelo codigo-fonte."
+        ],
+        "reassignment_reason": "Primeira atribuicao; nenhuma reatribuicao."
+      }
+    ],
+    "wave": 2,
+    "status": "candidate",
+    "agent_id": "verifier-2",
+    "reviewed_paths": [
+      "src/main/main.js",
+      "src/renderer/shell.js"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "verifier-2",
+        "reviewed_paths": [
+          "src/main/main.js",
+          "src/renderer/shell.js"
+        ],
+        "invariant": "Navegação e permissões de conteúdo web devem ser decididas por allowlist explícita no main.",
+        "method": "source",
+        "result": "Confirmados will-navigate com denylist, allowlist de permissões com media/clipboard-read e notifications permitidas em http.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [
+      "lumen/guest-will-navigate-external-open-denylist",
+      "lumen/permission-media-auto-granted-https",
+      "lumen/notifications-permitted-on-insecure-origins",
+      "lumen/private-session-no-permission-policy"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "main-adblock-store::network-and-local-file::filter-lists-and-json-store::supply-chain-and-path-traversal",
+    "canonical_refs": {
+      "surface": "main-adblock-store",
+      "boundary": "network-and-local-file",
+      "subsystem": "filter-lists-and-json-store",
+      "attack_class": "supply-chain-and-path-traversal"
+    },
+    "surface": "main-adblock-store",
+    "boundary": "network-and-local-file",
+    "subsystem": "filter-lists-and-json-store",
+    "attack_class": "supply-chain-and-path-traversal",
+    "starting_paths": [
+      "src/main/adblock.js",
+      "src/main/store.js",
+      "scripts/fetch-lists.js"
+    ],
+    "ordinary_attack_class_block": null,
+    "selected_companion_blocks": [],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "wave": 1,
+        "status": "candidate",
+        "agent_id": "hunter-adblock",
+        "reviewed_paths": [
+          "src/main/adblock.js",
+          "src/main/store.js",
+          "scripts/fetch-lists.js"
+        ],
+        "local_checks": [
+          {
+            "agent_id": "hunter-adblock",
+            "reviewed_paths": [
+              "src/main/adblock.js",
+              "scripts/fetch-lists.js"
+            ],
+            "invariant": "Conteúdo remoto que vira regra ativa (redirect/scriptlet) deve ter integridade verificada e limites explícitos antes de ser aplicado.",
+            "method": "source",
+            "result": "updateLists (adblock.js:321-342) faz fetch sem timeout, sem teto de tamanho e sem hash/assinatura, grava em assets/filters e reconstrói o motor com loadCosmeticFilters: true (adblock.js:31).",
+            "artifact": null
+          },
+          {
+            "agent_id": "hunter-adblock",
+            "reviewed_paths": [
+              "src/main/store.js",
+              "src/main/adblock.js"
+            ],
+            "invariant": "Desserialização de arquivo local não pode executar código nem conceder poder além do dono do perfil.",
+            "method": "source",
+            "result": "settings.json é lido com Object.assign (store.js:82), mas settings:set só aceita chaves de allowlist (main.js:212-225) e o cache do motor (adblock.js:134-140) tem fallback para parse, sem sink de execução.",
+            "artifact": null
+          }
+        ],
+        "result_fingerprints": [
+          "lumen/filter-list-update-no-integrity-or-limit",
+          "lumen/settings-json-prototype-pollution",
+          "lumen/engine-cache-deserialize"
+        ],
+        "unresolved": [
+          "Efeito de listas remotas depende de controle do host de origem ou quebra de TLS; nao demonstrado.",
+          "Comportamento interno de scriptlets da biblioteca @ghostery/adblocker nao executado nesta auditoria."
+        ],
+        "reassignment_reason": "Primeira atribuicao; nenhuma reatribuicao."
+      }
+    ],
+    "wave": 2,
+    "status": "candidate",
+    "agent_id": "verifier-4",
+    "reviewed_paths": [
+      "src/main/adblock.js",
+      "src/main/store.js",
+      "scripts/fetch-lists.js"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "verifier-4",
+        "reviewed_paths": [
+          "src/main/adblock.js",
+          "src/main/store.js",
+          "scripts/fetch-lists.js"
+        ],
+        "invariant": "Conteúdo remoto que vira regra ativa deve ter integridade verificada e limites explícitos.",
+        "method": "source",
+        "result": "Fetch sem timeout/limite/integridade confirmado; candidatos de poluição de protótipo e desserialização rejeitados por ausência de travessia de fronteira.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [
+      "lumen/filter-list-update-no-integrity-or-limit",
+      "lumen/settings-json-prototype-pollution",
+      "lumen/engine-cache-deserialize"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "renderer-shell::web-content-to-shell::tab-url-and-dom::xss-and-scheme-injection",
+    "canonical_refs": {
+      "surface": "renderer-shell",
+      "boundary": "web-content-to-shell",
+      "subsystem": "tab-url-and-dom",
+      "attack_class": "xss-and-scheme-injection"
+    },
+    "surface": "renderer-shell",
+    "boundary": "web-content-to-shell",
+    "subsystem": "tab-url-and-dom",
+    "attack_class": "xss-and-scheme-injection",
+    "starting_paths": [
+      "src/renderer/shell.js",
+      "src/renderer/shell.html"
+    ],
+    "ordinary_attack_class_block": null,
+    "selected_companion_blocks": [],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "wave": 1,
+        "status": "candidate",
+        "agent_id": "hunter-renderer",
+        "reviewed_paths": [
+          "src/renderer/shell.js",
+          "src/renderer/shell.html"
+        ],
+        "local_checks": [
+          {
+            "agent_id": "hunter-renderer",
+            "reviewed_paths": [
+              "src/renderer/shell.js"
+            ],
+            "invariant": "Toda URL que vira src de guest deve passar pela mesma validação de esquema usada na entrada digitada.",
+            "method": "source",
+            "result": "resolveInput (shell.js:122-135) valida, mas createWebTab (shell.js:198,229) não; chegam a ele popup (shell.js:1633), menu de contexto (shell.js:1099), arrastar arquivo (shell.js:1588) e restauração de sessão (shell.js:1673).",
+            "artifact": null
+          },
+          {
+            "agent_id": "hunter-renderer",
+            "reviewed_paths": [
+              "src/renderer/shell.js",
+              "src/renderer/shell.html"
+            ],
+            "invariant": "Interpolação de dados de terceiros em innerHTML deve usar escape adequado ao contexto.",
+            "method": "source",
+            "result": "escapeHtml (shell.js:95) cobre & < > \" ' e é aplicado em todos os pontos de interpolação verificados; a CSP de shell.html restringe script-src a 'self'. Nenhum sink de XSS em shell foi estabelecido.",
+            "artifact": null
+          }
+        ],
+        "result_fingerprints": [
+          "lumen/create-webtab-no-scheme-validation"
+        ],
+        "unresolved": [],
+        "reassignment_reason": "Primeira atribuicao; nenhuma reatribuicao."
+      }
+    ],
+    "wave": 2,
+    "status": "candidate",
+    "agent_id": "verifier-3",
+    "reviewed_paths": [
+      "src/renderer/shell.js",
+      "src/renderer/shell.html"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "verifier-3",
+        "reviewed_paths": [
+          "src/renderer/shell.js",
+          "src/renderer/shell.html"
+        ],
+        "invariant": "Toda URL que vira src de guest deve passar pela mesma validação de esquema usada na entrada digitada.",
+        "method": "source",
+        "result": "createWebTab não valida esquema; quatro call sites recebem URL de conteúdo web. Nenhum XSS confirmado na casca (escapeHtml aplicado e CSP script-src 'self').",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [
+      "lumen/create-webtab-no-scheme-validation"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "webview-guest::web-content-to-app::guest-navigation-and-permissions::permission-and-scheme-bypass",
+    "canonical_refs": {
+      "surface": "webview-guest",
+      "boundary": "web-content-to-app",
+      "subsystem": "guest-navigation-and-permissions",
+      "attack_class": "permission-and-scheme-bypass"
+    },
+    "surface": "webview-guest",
+    "boundary": "web-content-to-app",
+    "subsystem": "guest-navigation-and-permissions",
+    "attack_class": "permission-and-scheme-bypass",
+    "starting_paths": [
+      "src/renderer/shell.js",
+      "src/main/main.js"
+    ],
+    "ordinary_attack_class_block": null,
+    "selected_companion_blocks": [],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "wave": 1,
+        "status": "candidate",
+        "agent_id": "hunter-webview",
+        "reviewed_paths": [
+          "src/renderer/shell.js",
+          "src/main/main.js"
+        ],
+        "local_checks": [
+          {
+            "agent_id": "hunter-webview",
+            "reviewed_paths": [
+              "src/renderer/shell.js",
+              "src/main/main.js"
+            ],
+            "invariant": "Anexação de guests deve impor webPreferences seguras independentemente dos atributos pedidos pelo renderer.",
+            "method": "source",
+            "result": "webviewTag: true (main.js:496); nenhum will-attach-webview é registrado (main.js:624-627 só chama wireShortcuts); shell.js:231-233 define apenas allowpopups/partition. O guest não recebe preload nem tem acesso a window.lumen (shell.js:376 trata ipc-message como vazio), e a casca roda com sandbox/contextIsolation e CSP script-src 'self'.",
+            "artifact": null
+          }
+        ],
+        "result_fingerprints": [
+          "lumen/no-will-attach-webview-hardening"
+        ],
+        "unresolved": [
+          "O pre-requisito (execução de código no renderer) não foi estabelecido nesta auditoria."
+        ],
+        "reassignment_reason": "Primeira atribuicao; nenhuma reatribuicao."
+      }
+    ],
+    "wave": 2,
+    "status": "candidate",
+    "agent_id": "verifier-5",
+    "reviewed_paths": [
+      "src/renderer/shell.js",
+      "src/main/main.js"
+    ],
+    "local_checks": [
+      {
+        "agent_id": "verifier-5",
+        "reviewed_paths": [
+          "src/renderer/shell.js",
+          "src/main/main.js"
+        ],
+        "invariant": "Anexação de guests deve impor webPreferences seguras independentemente dos atributos pedidos pelo renderer.",
+        "method": "source",
+        "result": "Ausência de will-attach-webview confirmada; dano depende de comprometer o renderer.",
+        "artifact": null
+      }
+    ],
+    "result_fingerprints": [
+      "lumen/no-will-attach-webview-hardening"
+    ],
+    "unresolved": []
+  }
+]

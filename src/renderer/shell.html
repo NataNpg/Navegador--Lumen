@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self' data:"
+    />
+    <title>Lumen</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <svg id="sprite" aria-hidden="true">
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></symbol>
+      <symbol id="i-forward" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></symbol>
+      <symbol id="i-reload" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" /></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.9 5.9 6.5.9-4.7 4.6 1.1 6.4L12 17.8 6.2 20.8l1.1-6.4L2.6 9.8l6.5-.9z" /></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.5-3 8.2-7 9.5-4-1.3-7-5-7-9.5V6z" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 11 12 15.5 16.5 11" /><path d="M5 20h14" /></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" /><path d="M12 3v2.2M12 18.8V21M4.2 7.5l1.9 1.1M17.9 15.4l1.9 1.1M4.2 16.5l1.9-1.1M17.9 8.6l1.9-1.1" /></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4.2L6 21z" /></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3 4.5V10h5.4" /><path d="M12 8v4.4l3 1.8" /></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.5h6V7M6 7l1 13h10l1-13" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4.5 4.5L19 6.5" /></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" /></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" /></symbol>
+      <symbol id="i-private" viewBox="0 0 24 24"><path d="M4 11h16v9H4z" /><path d="M8 11V7.5a4 4 0 0 1 8 0" /><path d="M12 15v2" /></symbol>
+      <symbol id="i-volume" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3.5v-11L8 10z" /><path d="M16.5 9a4.5 4.5 0 0 1 0 6" /></symbol>
+      <symbol id="i-mute" viewBox="0 0 24 24"><path d="M5 10v4h3l4 3.5v-11L8 10z" /><path d="m16 10 4 4M20 10l-4 4" /></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 3l3 3-1.5 4 3.5 3.5L12 21l-5-7.5L10.5 10 9 6z" /></symbol>
+    </svg>
+
+    <div id="chrome">
+      <header id="tabstrip">
+        <div id="tabs" role="tablist"></div>
+        <button id="new-tab" class="icon-btn" title="Nova aba (Ctrl+T)" data-icon="i-plus"></button>
+        <div class="tabstrip-spacer"></div>
+        <div id="tabstrip-end">
+          <button id="downloads-btn" class="icon-btn" title="Downloads (Ctrl+J)" data-icon="i-download"></button>
+        </div>
+      </header>
+
+      <div id="toolbar">
+        <div class="nav-group">
+          <button id="nav-back" class="icon-btn" title="Voltar (Alt+←)" data-icon="i-back"></button>
+          <button id="nav-forward" class="icon-btn" title="Avançar (Alt+→)" data-icon="i-forward"></button>
+          <button id="nav-reload" class="icon-btn" title="Recarregar (Ctrl+R)" data-icon="i-reload"></button>
+          <button id="nav-home" class="icon-btn" title="Início" data-icon="i-home"></button>
+        </div>
+
+        <div id="omnibox">
+          <button id="shield" class="shield-btn" title="Bloqueador de anúncios">
+            <svg class="icon"><use href="#i-shield" /></svg>
+            <span id="shield-count" class="shield-count" hidden>0</span>
+          </button>
+          <div id="omni-left-icon">
+            <svg class="icon" id="omni-lock"><use href="#i-lock" /></svg>
+            <svg class="icon" id="omni-search"><use href="#i-search" /></svg>
+          </div>
+          <input id="omnibox-input" type="text" spellcheck="false" autocomplete="off" placeholder="Pesquisar ou digitar URL" />
+          <button id="omni-stop" class="icon-btn small" title="Parar" data-icon="i-close" hidden></button>
+          <button id="star" class="icon-btn small" title="Favoritar (Ctrl+D)" data-icon="i-star"></button>
+        </div>
+
+        <div class="toolbar-end">
+          <button id="menu-btn" class="icon-btn" title="Menu" data-icon="i-menu"></button>
+        </div>
+      </div>
+
+      <div id="bookmarkbar" hidden></div>
+    </div>
+
+    <main id="viewport">
+      <div id="webviews"></div>
+
+      <section class="page" id="page-newtab">
+        <div class="nt-bg"></div>
+        <div class="nt-inner">
+          <div class="nt-clock">
+            <div id="nt-time">--:--</div>
+            <div id="nt-date">—</div>
+          </div>
+          <form id="nt-search" class="nt-search" autocomplete="off">
+            <svg class="icon"><use href="#i-search" /></svg>
+            <input id="nt-input" type="text" spellcheck="false" placeholder="Pesquisar na web" />
+            <span id="nt-engine" class="nt-engine">Google</span>
+          </form>
+          <div id="nt-links" class="nt-links"></div>
+          <div class="nt-hint">Lumen · bloqueador de anúncios integrado</div>
+        </div>
+      </section>
+
+      <section class="page" id="page-settings">
+        <div class="page-scroll">
+          <div class="page-head">
+            <h1>Configurações</h1>
+            <p>Ajuste o Lumen do seu jeito.</p>
+          </div>
+          <div id="settings-root"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-bookmarks">
+        <div class="page-scroll">
+          <div class="page-head">
+            <h1>Favoritos</h1>
+            <p>Sites salvos para voltar depois.</p>
+          </div>
+          <div id="bookmarks-root"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-history">
+        <div class="page-scroll">
+          <div class="page-head">
+            <h1>Histórico</h1>
+            <p>Atividade de navegação recente.</p>
+            <div class="head-actions">
+              <div class="tool-search">
+                <svg class="icon"><use href="#i-search" /></svg>
+                <input id="history-search" type="text" placeholder="Buscar no histórico" spellcheck="false" />
+              </div>
+              <button id="history-clear" class="btn ghost">Limpar histórico</button>
+            </div>
+          </div>
+          <div id="history-root"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-downloads">
+        <div class="page-scroll">
+          <div class="page-head">
+            <h1>Downloads</h1>
+            <p>Arquivos baixados recentemente.</p>
+          </div>
+          <div id="downloads-root"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-about">
+        <div class="page-scroll">
+          <div class="page-head">
+            <h1>Sobre o Lumen</h1>
+            <p>Navegador leve com bloqueio de anúncios integrado.</p>
+          </div>
+          <div id="about-root"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="findbar" hidden>
+      <div class="find-field">
+        <svg class="icon"><use href="#i-search" /></svg>
+        <input id="find-input" type="text" placeholder="Encontrar na página" spellcheck="false" />
+        <span id="find-count">0/0</span>
+      </div>
+      <button id="find-prev" class="icon-btn" title="Anterior" data-icon="i-back"></button>
+      <button id="find-next" class="icon-btn" title="Próximo" data-icon="i-forward"></button>
+      <button id="find-close" class="icon-btn" title="Fechar" data-icon="i-close"></button>
+    </div>
+
+    <div id="panel-downloads" class="panel" hidden>
+      <div class="panel-head">
+        <h2>Downloads</h2>
+        <button id="dl-panel-clear" class="btn ghost tiny">Limpar</button>
+      </div>
+      <div id="dl-panel-list" class="panel-body"></div>
+    </div>
+
+    <div id="shield-popover" class="popover" hidden>
+      <div class="pop-head">
+        <div class="pop-title">
+          <span class="shield-orb"><svg class="icon"><use href="#i-shield" /></svg></span>
+          <div>
+            <div class="pop-title-main">Lumen Shield</div>
+            <div class="pop-title-sub" id="shield-sub">Proteção ativa</div>
+          </div>
+        </div>
+        <button class="switch on" id="ab-global" role="switch" aria-checked="true"><span></span></button>
+      </div>
+      <div class="pop-block" id="shield-on">
+        <div class="stat">
+          <div class="stat-num" id="ab-count">0</div>
+          <div class="stat-label">bloqueados nesta página</div>
+        </div>
+        <div class="pop-row">
+          <div>
+            <div class="row-title">Anúncios e rastreadores</div>
+            <div class="row-sub">Listas EasyList, uBlock e EasyPrivacy</div>
+          </div>
+          <button class="switch on" id="ab-youtube" role="switch" aria-checked="true"><span></span></button>
+        </div>
+        <div class="pop-row">
+          <div>
+            <div class="row-title">Anúncios do YouTube</div>
+            <div class="row-sub">Bloqueio de anúncios em vídeo e banners</div>
+          </div>
+          <button class="switch on" id="ab-youtube2" role="switch" aria-checked="true"><span></span></button>
+        </div>
+        <button id="ab-pause-site" class="btn ghost full">Pausar neste site</button>
+      </div>
+      <div class="pop-block" id="shield-off" hidden>
+        <div class="stat">
+          <div class="stat-num">0</div>
+          <div class="stat-label">proteção desligada</div>
+        </div>
+        <p class="pop-note">O bloqueador está desativado. Nenhum filtro será aplicado até você reativar.</p>
+      </div>
+      <div class="pop-foot">
+        <button id="ab-update" class="btn ghost tiny">Atualizar listas</button>
+        <span id="ab-status" class="muted tiny-text"></span>
+      </div>
+    </div>
+
+    <div id="menu-popover" class="popover menu" hidden>
+      <button class="menu-item" data-action="tab:new"><svg class="icon"><use href="#i-plus" /></svg>Nova aba<span class="kbd">Ctrl T</span></button>
+      <button class="menu-item" data-action="window:private"><svg class="icon"><use href="#i-private" /></svg>Janela privada<span class="kbd">Ctrl ⇧ N</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" data-action="bookmark"><svg class="icon"><use href="#i-star" /></svg>Adicionar aos favoritos<span class="kbd">Ctrl D</span></button>
+      <button class="menu-item" data-action="find"><svg class="icon"><use href="#i-search" /></svg>Encontrar na página<span class="kbd">Ctrl F</span></button>
+      <button class="menu-item" data-action="page:bookmarks"><svg class="icon"><use href="#i-bookmark" /></svg>Favoritos<span class="kbd">Ctrl ⇧ B</span></button>
+      <button class="menu-item" data-action="page:history"><svg class="icon"><use href="#i-history" /></svg>Histórico<span class="kbd">Ctrl H</span></button>
+      <button class="menu-item" data-action="page:downloads"><svg class="icon"><use href="#i-download" /></svg>Downloads<span class="kbd">Ctrl J</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" data-action="zoom:out"><span class="zoom-label">Diminuir zoom</span><span class="kbd">Ctrl −</span></button>
+      <button class="menu-item" data-action="zoom:reset"><span class="zoom-label">Zoom normal</span><span class="kbd">Ctrl 0</span></button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" data-action="page:settings"><svg class="icon"><use href="#i-settings" /></svg>Configurações<span class="kbd">Ctrl ,</span></button>
+      <button class="menu-item" data-action="about"><svg class="icon"><use href="#i-shield" /></svg>Sobre o Lumen</button>
+    </div>
+
+    <div id="ctx-menu" class="ctx-menu" hidden></div>
+
+    <div id="toast" hidden></div>
+  </body>
+  <script src="shell.js"></script>
+</html>

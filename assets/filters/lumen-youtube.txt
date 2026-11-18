@@ -1,0 +1,16 @@
+[Lumen] YouTube ads - network layer
+! Only request-level rules that are safe: never blocks media playlists or player APIs.
+||youtube.com/api/stats/ads^
+||youtube.com/pagead^
+||youtube.com/ptracking^
+||youtube.com/get_midroll_info^
+||youtube.com/youtubei/v1/get_midroll_info^
+||youtube.com/gen_204^
+||googlesyndication.com^
+||doubleclick.net^
+||adservice.google.com^
+||googleadservices.com^
+||googletagservices.com^
+||static.doubleclick.net^
+||www.youtube.com/pagead/
+||youtube.com/api/stats/ads
